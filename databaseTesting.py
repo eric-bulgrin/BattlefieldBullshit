@@ -11,6 +11,18 @@ def get_stats(playerId, userId, s, conn, platform):
   start = time.time()
   cursor = conn.cursor()
 
+  # First we check to see if this player already exists and needs UPDATED vs INSERTED
+  update = False
+  
+  cursor.execute("""SELECT player_id, current_name FROM BF4_PLAYERS WHERE player_id=?""", (playerId,))
+  player_id_list = cursor.fetchall()
+
+  for row in player_id_list:
+    if playerId == row[0]:
+      update = True
+      oldName = row[1]
+      break
+
   """ PLAYER DATA """
   currentName = ''
 
@@ -38,7 +50,7 @@ def get_stats(playerId, userId, s, conn, platform):
 
   if currentName == '':
     # call other API to see if they have the name
-    payload = {'format_values': 'true', 'playerid': playerId, 'platform': 'pc'}
+    payload = {'format_values': 'true', 'playerid': playerId, 'platform': platform}
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0", "Accept-Encoding": "*", "Connection": "keep-alive"}
     gameToolsApi = s.get('https://api.gametools.network/bf4/all', params=payload, headers=headers)
     # if the player exists it will return a 200 status and we'll look for the username
@@ -50,18 +62,6 @@ def get_stats(playerId, userId, s, conn, platform):
     if currentName == '':
       print(f"Returning early - couldn't find player name\n\n")
       return
-
-  # First we check to see if this player already exists and needs UPDATED vs INSERTED
-  update = False
-  
-  cursor.execute("""SELECT player_id, current_name FROM BF4_PLAYERS WHERE player_id=?""", (playerId,))
-  player_id_list = cursor.fetchall()
-
-  for row in player_id_list:
-    if playerId == row[0]:
-      update = True
-      oldName = row[1]
-      break
   
   try:
     with conn:
@@ -117,7 +117,7 @@ def get_stats(playerId, userId, s, conn, platform):
     warsawDetailedStats = warsawDetailedStats + '/1/'
   elif platform == 'ps4':
     warsawDetailedStats = warsawDetailedStats + '/32/'
-  elif platform == 'xb1':
+  elif platform == 'xboxone':
     warsawDetailedStats = warsawDetailedStats + '/64/'
 
   startAPIrequest = time.time()
@@ -214,7 +214,7 @@ def get_stats(playerId, userId, s, conn, platform):
     warsawWeaponStats = warsawWeaponStats + '/1/stats/'
   elif platform == 'ps4':
     warsawWeaponStats = warsawWeaponStats + '/32/stats/'
-  elif platform == 'xb1':
+  elif platform == 'xboxone':
     warsawWeaponStats = warsawWeaponStats + '/64/stats/'
 
   startAPIrequest = time.time()
@@ -1279,7 +1279,7 @@ def get_stats(playerId, userId, s, conn, platform):
     warsawVehicleStats = warsawVehicleStats + '/1/stats/'
   elif platform == 'ps4':
     warsawVehicleStats = warsawVehicleStats + '/32/stats/'
-  elif platform == 'xb1':
+  elif platform == 'xboxone':
     warsawVehicleStats = warsawVehicleStats + '/64/stats/'
 
   startAPIrequest = time.time()
@@ -1574,7 +1574,7 @@ def get_stats(playerId, userId, s, conn, platform):
     warsawRibbonStats = warsawRibbonStats + '/1/'
   elif platform == 'ps4':
     warsawRibbonStats = warsawRibbonStats + '/32/'
-  elif platform == 'xb1':
+  elif platform == 'xboxone':
     warsawRibbonStats = warsawRibbonStats + '/64/'
 
   startAPIrequest = time.time()
@@ -1726,9 +1726,9 @@ def threaded_process(data):
               # if the player exists it will return a 200 status and we'll add/update their database tables
               if bf4api.status_code == requests.codes.ok:
                 response = bf4api.json()
-                get_stats(response, conn, 'xb1')
+                get_stats(response, conn, 'xboxone')
           '''
-      time.sleep(4) # to avoid API rate limit
+      time.sleep(3) # to avoid API rate limit
     
     s.close()
 
