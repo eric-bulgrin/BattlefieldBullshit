@@ -37,8 +37,19 @@ def get_stats(playerId, userId, s, conn, platform):
       break
 
   if currentName == '':
-    print(f"Returning early - couldn't find player name via userId\n\n")
-    return
+    # call other API to see if they have the name
+    payload = {'format_values': 'true', 'playerid': playerId, 'platform': 'pc'}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0", "Accept-Encoding": "*", "Connection": "keep-alive"}
+    gameToolsApi = s.get('https://api.gametools.network/bf4/all', params=payload, headers=headers)
+    # if the player exists it will return a 200 status and we'll look for the username
+    if gameToolsApi.status_code == requests.codes.ok:
+      gameToolsJson = gameToolsApi.json()
+      currentName = gameToolsJson['userName']
+    
+    # if still no username then give up I guess
+    if currentName == '':
+      print(f"Returning early - couldn't find player name\n\n")
+      return
 
   # First we check to see if this player already exists and needs UPDATED vs INSERTED
   update = False
@@ -1670,7 +1681,7 @@ def threaded_process(data):
   try:
     conn = sqlite3.connect('C:/Program Files/DB Browser for SQLite/Battlefield Database.db', timeout=300)
     s = requests.Session()
-    retries = Retry(total=10, backoff_factor=0.1, status_forcelist=[400, 403, 404, 408, 422, 429, 500, 501, 502, 503, 504])
+    retries = Retry(total=10, backoff_factor=0.2, status_forcelist=[400, 403, 404, 408, 422, 429, 500, 501, 502, 503, 504])
     s.mount('http://', HTTPAdapter(max_retries=retries))
 
     # iterate through json
@@ -1717,7 +1728,7 @@ def threaded_process(data):
                 response = bf4api.json()
                 get_stats(response, conn, 'xb1')
           '''
-      time.sleep(5) # to avoid API rate limit
+      time.sleep(4) # to avoid API rate limit
     
     s.close()
 
