@@ -13,13 +13,13 @@ def threaded_process(data):
 
     with open("PC_marksmen_results.csv", "w", newline='') as f:
       writer = csv.writer(f)
-      header = [['PlayerID', 'MarksmanRibbons', 'SniperHours', 'RibbonsPerHour', 'SniperKills', 'SniperHeadshots', 'HSKratio', 'RibbonsPerHeadshot']]
+      header = [['PlayerID', 'MarksmanRibbons', 'SniperHours', 'RibbonsPerHour', 'SniperKills', 'SniperKPM', 'SniperHeadshots', 'HSKratio', 'RibbonsPerHeadshot', 'LongestHeadshot']]
       writer.writerows(header)
       # iterate through json
       for x in data:
         for key, value in x.items():
           if key == '_id':
-            cursor.execute("""SELECT BF4_RIBBONS.MARKSMAN_RIBBON, BF4_WEAPONS_SNIPER_STATS.* FROM BF4_RIBBONS INNER JOIN BF4_WEAPONS_SNIPER_STATS ON BF4_RIBBONS.player_id = BF4_WEAPONS_SNIPER_STATS.player_id WHERE BF4_RIBBONS.player_id = ?""", (value,))
+            cursor.execute("""SELECT BF4_RIBBONS.MARKSMAN_RIBBON, BF4_WEAPONS_SNIPER_STATS.*, BF4_BASE_STATS.longest_headshot FROM BF4_RIBBONS LEFT JOIN BF4_WEAPONS_SNIPER_STATS ON BF4_RIBBONS.player_id = BF4_WEAPONS_SNIPER_STATS.player_id LEFT JOIN BF4_BASE_STATS ON BF4_RIBBONS.player_id = BF4_BASE_STATS.player_id WHERE BF4_RIBBONS.player_id = ?""", (value,))
             player_info = cursor.fetchall()
             for row in player_info:
               marksmanRibbons = row[0]
@@ -27,11 +27,14 @@ def threaded_process(data):
               sniperKills = row[2] + row[7] + row[12] + row[17] + row[22] + row[27] + row[32] + row[37] + row[42] + row[47] + row[52] + row[57] + row[62] + row[67] + row[72]
               sniperHeadshots = row[3] + row[8] + row[13] + row[18] + row[23] + row[28] + row[33] + row[38] + row[43] + row[48] + row[53] + row[58] + row[63] + row[68] + row[73]
               timePlayed = row[6] + row[11] + row[16] + row[21] + row[26] + row[31] + row[36] + row[41] + row[46] + row[51] + row[56] + row[61] + row[66] + row[71] + row[76]
+              longestHeadshot = row[77]
+              sniperMinutes = timePlayed / 60
               sniperHours = timePlayed / 3600
+              sniperKPM = sniperKills / sniperMinutes
               perHour = marksmanRibbons / sniperHours
               hskr = (sniperHeadshots / sniperKills) * 100
               perHead = (marksmanRibbons / sniperHeadshots) * 100
-              stats = [[playerId, marksmanRibbons, round(sniperHours,2), round(perHour,3), sniperKills, sniperHeadshots, round(hskr,2), round(perHead,2)]]
+              stats = [[playerId, marksmanRibbons, round(sniperHours,2), round(perHour,3), sniperKills, round(sniperKPM,3), sniperHeadshots, round(hskr,2), round(perHead,2), longestHeadshot]]
               writer.writerows(stats)
 
   except sqlite3.Error as error:

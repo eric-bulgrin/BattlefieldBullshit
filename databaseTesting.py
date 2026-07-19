@@ -48,20 +48,22 @@ def get_stats(playerId, userId, s, conn, platform):
       currentName = soldier['persona']['personaName']
       break
 
+  # Comment out block to toggle off the 2nd look API
   if currentName == '':
-    # call other API to see if they have the name
+    # call other API to see if they have the name 
+    # WARNING: this API is extremely volatile/inconsistent - should only be used for 2nd look
     payload = {'format_values': 'true', 'playerid': playerId, 'platform': platform}
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0", "Accept-Encoding": "*", "Connection": "keep-alive"}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0", "Accept-Encoding": "*", "Connection": "close"}
     gameToolsApi = s.get('https://api.gametools.network/bf4/all', params=payload, headers=headers)
     # if the player exists it will return a 200 status and we'll look for the username
     if gameToolsApi.status_code == requests.codes.ok:
       gameToolsJson = gameToolsApi.json()
       currentName = gameToolsJson['userName']
-    
-    # if still no username then give up I guess
-    if currentName == '':
-      print(f"Returning early - couldn't find player name\n\n")
-      return
+
+  # if still no username then give up I guess
+  if currentName == '':
+    print(f"Returning early - couldn't find player name\n\n")
+    return
   
   try:
     with conn:
@@ -1681,8 +1683,10 @@ def threaded_process(data):
   try:
     conn = sqlite3.connect('C:/Program Files/DB Browser for SQLite/Battlefield Database.db', timeout=300)
     s = requests.Session()
-    retries = Retry(total=10, backoff_factor=0.2, status_forcelist=[400, 403, 404, 408, 422, 429, 500, 501, 502, 503, 504])
-    s.mount('http://', HTTPAdapter(max_retries=retries))
+    retries = Retry(total=20, backoff_factor=0.5, status_forcelist=[400, 403, 404, 408, 422, 429, 500, 501, 502, 503, 504])
+    adapter = HTTPAdapter(max_retries=retries)
+    s.mount("http://", adapter)
+    s.mount("https://", adapter)
 
     # iterate through json
     for x in data:
@@ -1698,9 +1702,11 @@ def threaded_process(data):
 
           overviewResponseJson = overviewResponse.json()
           overview = overviewResponseJson['data']
-          if "currentUserId" in overview:
+          if ("currentUserId" in overview) and ("overviewStats" in overview):
             userId = overview['currentUserId']
-            get_stats(value, userId, s, conn, 'pc')
+            # there are a lot of real accounts with 0 stats that end up breaking the code later down the line
+            if overview['overviewStats']['timePlayed'] > 0:
+              get_stats(value, userId, s, conn, 'pc')
 
           '''
           # call API to see if playerId exists as PC player
@@ -1728,7 +1734,7 @@ def threaded_process(data):
                 response = bf4api.json()
                 get_stats(response, conn, 'xboxone')
           '''
-      time.sleep(3) # to avoid API rate limit
+      time.sleep(3) # to avoid hitting API rate limit too often
     
     s.close()
 
@@ -1745,6 +1751,8 @@ json_file = 'C:/Users/bige3/OneDrive/Documents/playerIds_2.json'
 with open(json_file) as json_data:
   data = json.load(json_data)
 
+# used for multithreading the process and evenly splitting the json file across n-threads
+# no longer useful because of battlelog API limits, so just using 1 thread
 n_threads = 1
 json_chunk = np.array_split(data, n_threads)
 
